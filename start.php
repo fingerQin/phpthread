@@ -1,7 +1,8 @@
 <?php
 /**
- * 业务多线程处理.
- * FileName : Test.php
+ * 业务多线程处理
+ * @author winerQin
+ * @date 2017-05-18
  */
 
 include_once('Thread.php');
