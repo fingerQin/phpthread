@@ -107,7 +107,8 @@ abstract class Thread
      * 
      * @return void
      */
-    final public function setTimeout($timeout = 60) {
+    final public function setTimeout($timeout = 60) 
+    {
         self::$timeout = $timeout;
     }
 
@@ -116,7 +117,8 @@ abstract class Thread
      *
      * @return integer
      */
-    final public function getTimeout() {
+    final public function getTimeout()
+    {
         return self::$timeout;
     }
 
@@ -129,7 +131,8 @@ abstract class Thread
      * 
      * @return boolean|void true-超时、false-未超时。
      */
-    protected function isTimeout($timeoutExit = false) {
+    protected function isTimeout($timeoutExit = false) 
+    {
         pcntl_signal_dispatch();
         if (self::$masterExit) {
             exit(0);
@@ -156,7 +159,8 @@ abstract class Thread
      * 
      * @return void
      */
-    final protected function registerSubProcessPcntlSignal() {
+    final protected function registerSubProcessPcntlSignal() 
+    {
         pcntl_signal(SIGTERM, array($this, "signalSubProcessHandler"));
         pcntl_signal(SIGHUP, array($this, "signalSubProcessHandler"));
         pcntl_signal(SIGINT, array($this, "signalSubProcessHandler"));
@@ -173,7 +177,8 @@ abstract class Thread
      * 
      * @return void
      */
-    final protected function signalSubProcessHandler($signo) {
+    final protected function signalSubProcessHandler($signo) 
+    {
         $subPID  = posix_getpid();
         $errData = error_get_last();
         $errStr  = json_encode($errData);
@@ -185,7 +190,8 @@ abstract class Thread
      * @param  string $log 日志内容。
      * @return void
      */
-    final protected function writeLog($log) {
+    final protected function writeLog($log) 
+    {
         $time = time();
         $logFilePath = date('YmdH', $time) . '.log';
         $log = date('Y-m-d H:i:s') . " ErrMsg:" . $log . "\n";
@@ -196,7 +202,8 @@ abstract class Thread
      * 子进程脚本正常退出时访问该方法。
      * @return void
      */
-    protected function shutdown() {
+    protected function shutdown() 
+    {
         $errInfo = error_get_last();
         if (!empty($errInfo)) {
             $this->writeLog(json_encode($errInfo));
