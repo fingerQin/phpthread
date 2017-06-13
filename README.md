@@ -2,7 +2,7 @@
 PHP  以 pcntl 与 posix 两个扩展实现的 PHP 多进程工具。简单实用，方便一些轻量级的后台任务实现并发处理。而 pcntl 与 posix 只有 *unix 环境支持。也就是说 windows 系统不支持。
 
 # 使用
-1. 将代码 close 到本地。然后，修改 start.php 里面的 run() 方法。
+1. 将代码 clone 到本地。然后，修改 start.php 里面的 run() 方法。
 2. 在 run() 方法当中实现自己的业务。保证业务是事务型。除非业务对事务型不关心。
 
 ## 启动 ##

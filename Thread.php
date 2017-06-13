@@ -20,13 +20,7 @@ abstract class Thread
     private $childProCount    = 0;       // 当前子进程数量。 
     protected static $timeout = 3;       // 子进程超时时间。单位(秒)。 0代表不超时。需要子进程在指定方法实现。
     protected $startTime      = 0;       // 子进程启动时的时间戳。
-
-    /**
-     * 主进程是否发出子进程退出指令。
-     * -- 子进程收到这个标记之后处理完当前数据再退出。
-     * @var boolean
-     */
-    protected static $masterExit = false;
+    protected $shareMemoryId  = null;    // 共享内存ID。用于控制子进程平滑退出。
 
     /**
      * 构造方法实现单例。 
@@ -56,6 +50,13 @@ abstract class Thread
      */
     final public function start()
     {
+        $pid = posix_getpid(); // 获取当前进程ID。亦是当前所有子进程的父进程ID。
+        file_put_contents('master.pid', $pid);
+
+        $shm_key = ftok(__FILE__, 't');
+        $this->shareMemoryId = shmop_open($shm_key, "c", 0644, 100);
+        shmop_write($this->shareMemoryId, "exit", 0);
+
         declare(ticks = 1);
         // 配合pcntl_signal使用，简单的说，是为了让系统产生时间云，让信号捕捉函数能够捕捉到信号量。
         if (function_exists('pcntl_fork')) {
@@ -134,7 +135,9 @@ abstract class Thread
     protected function isTimeout($timeoutExit = false) 
     {
         pcntl_signal_dispatch();
-        if (self::$masterExit) {
+        // 子进程接收父进程的指令。
+        $subProcessOrder = shmop_read($this->shareMemoryId, 0, 4);
+        if ($subProcessOrder == "exit") {
             exit(0);
         }
         $time = time();

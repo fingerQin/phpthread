@@ -32,7 +32,6 @@ class Start extends Thread
     {
         for (;;) {
             sleep(1);
-            $html = @file_get_contents('http://www.baidu.com');
             $this->isTimeout(true);
         }
     }
