@@ -32,12 +32,11 @@ class Start extends Thread
     {
         for (;;) {
             sleep(1);
-            $this->isTimeout(true);
         }
     }
 }
 
 // 执行多线程业务处理.
 $objThread = Start::getInstance(Start::PROGRESS_NUM);
-$objThread->setTimeout(60); // 1 分钟之后子进程退出重启。避免内存泄漏。
+$objThread->setChildOverNewCreate(false);
 $objThread->start();
