@@ -26,9 +26,12 @@ class Start extends Thread
      * -- 在 run 中编写的方法请一定要确定是事务型的。要么成功要么失败。要处于好失败情况下的数据处理。
      * -- 已经将 pcntl_signal_dispatch() 写入 isTimeout();
      * 
+     * @param  int  $threadNum  进程数量。
+     * @param  int  $num        子进程编号。
+     * 
      * @return void
      */
-    public function run()
+    public function run($threadNum, $num)
     {
         for (;;) {
             sleep(1);
