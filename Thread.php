@@ -17,6 +17,10 @@
 abstract class Thread
 {
 
+    protected $masterPid           = 0;       // 主进程 ID。
+    protected $masterStatus        = 1;       // 主进程状态。
+    protected $childsPidKill       = [];      // 存储收到结束子进程的信号的 PID。
+
     protected $isNewCreate         = true;    // 子进程结束之后是否新创建。
     protected $threadNum           = 10;      // 总的进程数量。
     protected $childCount          = 0;       // 当前子进程数量。 
@@ -29,7 +33,9 @@ abstract class Thread
      *
      * @return void
      */
-    private function __construct() {}
+    private function __construct()
+    {
+    }
 
     /**
      * 单例对象实现。
@@ -53,7 +59,12 @@ abstract class Thread
     final public function start()
     {
         if (function_exists('pcntl_fork')) {
-            while(true) {
+            $this->masterPid = posix_getpid();
+            $this->clear();
+            $this->command();
+            $this->registerSignal();
+
+            while($this->masterStatus) {
                 $this->childCount++; // 子进程数量加1。
                 // 如果当前子进程数量小于等于允许的进程数量或允许子进程结束新开子进程的情况则执行。
                 if (($this->childCount <= $this->threadNum) || $this->isNewCreate == true) {
@@ -76,10 +87,85 @@ abstract class Thread
                     exit(0);
                 }
             }
-            $this->registerSignal();
         } else {
             echo "You have no extension: pcntl_fork!\n";
             exit(0);
+        }
+    }
+
+     /**
+      * 运行指令
+      *
+      * @return void
+      */
+     public function command()
+     {
+         // 检查运行命令的参数
+         global $argv;
+         $start_file = $argv[0];
+         // 命令
+         $command = isset($argv[1]) ? trim($argv[1]) : 'start';
+         // 进程号
+         $pid = isset($argv[2]) ? $argv[2] : '';
+  
+         // 根据命令做相应处理
+         switch ($command) {
+             case 'start':
+                 break;
+             case 'stop':
+                 exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}'", $info);
+                 if (count($info) <= 1) {
+                     echo " [$start_file] not run\n";
+                 } else {
+                     echo "[$start_file] stop success";
+                     exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}' |xargs kill -SIGINT", $info);
+                 }
+                 exit;
+                 break;
+             case 'stop-pid':
+                 echo "[$start_file] stop pid {$pid}";
+                 exec("kill {$pid} -SIGINT");
+                 exit;
+                 break;
+             case 'kill':
+                 exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}' |xargs kill -SIGKILL");
+                 break;
+             case 'kill-pid':
+                 exec("kill {$pid} -SIGKILL");
+                 exit;
+                 break;
+             case 'status':
+                 exit(0);
+             // 未知命令
+             default :
+                 exit("Usage: php yourfile.php {start|stop|kill}\n");
+         }
+    }
+
+    /**
+     * 系统负载
+     *
+     * @return void
+     */
+    public function getSysLoad()
+    {
+        $loadavg = sys_getloadavg();
+        foreach ($loadavg as $k => $v) {
+            $loadavg[$k] = round($v, 2);
+        }
+        return implode(", ", $loadavg);
+    }
+
+    /**
+     * 清屏
+     *
+     * @return void
+     */
+    public function clear()
+    {
+        $arr = array(27, 91, 72, 27, 91, 50, 74);
+        foreach ($arr as $a) {
+            echo chr($a);
         }
     }
 
@@ -145,10 +231,10 @@ abstract class Thread
      */
     final public function registerSignal()
     {
-        pcntl_signal(SIGTERM, 'sig_handler');
-        pcntl_signal(SIGHUP,  'sig_handler');
-        pcntl_signal(SIGKILL, 'sig_handler');
-        pcntl_signal(SIGINT, 'sig_handler');
+        pcntl_signal(SIGTERM, [$this, 'signalHandler']);
+        pcntl_signal(SIGHUP,  [$this, 'signalHandler']);
+        pcntl_signal(SIGINT, [$this, 'signalHandler']);
+        pcntl_signal(SIGUSR1, [$this, 'signalHandler']);
     }
 
     /**
@@ -162,14 +248,18 @@ abstract class Thread
     {
         switch ($signo) {
             case SIGTERM: // 进程退出。
-            case SIGKILL: // 进程退出。
             case SIGINT:  // 进程退出。
-                echo "进程已退出......\n";
-                exit;
+                if (posix_getpid() == $this->masterPid) {
+                    $this->masterStatus = 0; // 设置主进程完毕
+                } else {
+                    // 子进程收到退出信号。
+                    $this->childsPidKill[] = posix_getpid();
+                }
                 break;
             case SIGHUP: // 重启进程。
+            case SIGUSR1:
             default:
-                echo "进程启动中......\n";
+                $this->childsPidKill[] = posix_getpid(); // 子进程收到平滑重启信号。
                 break;
         }
     }
