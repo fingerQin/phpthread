@@ -76,6 +76,7 @@ abstract class Thread
                     exit(0);
                 }
             }
+            $this->registerSignal();
         } else {
             echo "You have no extension: pcntl_fork!\n";
             exit(0);
@@ -135,6 +136,42 @@ abstract class Thread
     final public function getThreadNum()
     {
         return $this->threadNum;
+    }
+
+    /**
+     * 父进程注册信号。
+     *
+     * @return void
+     */
+    final public function registerSignal()
+    {
+        pcntl_signal(SIGTERM, 'sig_handler');
+        pcntl_signal(SIGHUP,  'sig_handler');
+        pcntl_signal(SIGKILL, 'sig_handler');
+        pcntl_signal(SIGINT, 'sig_handler');
+    }
+
+    /**
+     * 信号处理器。
+     *
+     * @param  int  $signo  信号量。
+     *
+     * @return void
+     */
+    final public function signalHandler($signo)
+    {
+        switch ($signo) {
+            case SIGTERM: // 进程退出。
+            case SIGKILL: // 进程退出。
+            case SIGINT:  // 进程退出。
+                echo "进程已退出......\n";
+                exit;
+                break;
+            case SIGHUP: // 重启进程。
+            default:
+                echo "进程启动中......\n";
+                break;
+        }
     }
 
     /**
