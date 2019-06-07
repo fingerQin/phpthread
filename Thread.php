@@ -2,12 +2,10 @@
 /**
  * 多进程工具封装。
  * -- 1、本工具请确定 PHP 已经安装了 pcntl 与 posix 两个扩展。
- * -- 2、进程信号
- * SIGHUP  : 挂起信号,编号为1。一般用于告诉守护进程平滑重启服务器。
- * SIGQUIT : 退出信号,编号为3。
- * SIGTERM : 软件终止信号,编号为15。
- * SIGINT  : 中断信号,编号为2。当用户输入 Ctrl + C 时由终端驱动程序发送 INT 信号。
- * SIGKILL : 杀死/删除进程，编号为9。
+ * -- 2、该程序已实现平滑重启子进程。
+ * -- 3、不能直接使用 KIIL -9 杀死子进程。
+ * -- 4、要实现对子进程的平滑重启，直接杀死主进程即可。子进程会判断主进程是否存在来决定是否退出。
+ * -- 5、子进程会根据设定的时候结束自己。主进程根据配置决定是否重启子进程。
  * 
  * @author fingerQin
  * @date 2017-09-15
@@ -18,8 +16,7 @@ abstract class Thread
 {
 
     protected $masterPid           = 0;       // 主进程 ID。
-    protected $masterStatus        = 1;       // 主进程状态。
-    protected $childsPidKill       = [];      // 存储收到结束子进程的信号的 PID。
+    protected $runDurationExit     = 0;       // 子进程运行多久自动退出。0 代表不退出。0 用于那些多进程一次性运算业务。
 
     protected $isNewCreate         = true;    // 子进程结束之后是否新创建。
     protected $threadNum           = 10;      // 总的进程数量。
@@ -60,14 +57,13 @@ abstract class Thread
     {
         if (function_exists('pcntl_fork')) {
             $this->masterPid = posix_getpid();
-            $this->clear();
-            $this->command();
             $this->registerSignal();
 
-            while($this->masterStatus) {
+            while(true) {
                 $this->childCount++; // 子进程数量加1。
                 // 如果当前子进程数量小于等于允许的进程数量或允许子进程结束新开子进程的情况则执行。
                 if (($this->childCount <= $this->threadNum) || $this->isNewCreate == true) {
+                    sleep(mt_rand(1, 4));
                     $pid = pcntl_fork();
                     if ($pid == -1) {
                         exit('could not fork');
@@ -80,92 +76,63 @@ abstract class Thread
                         }
                     } else {
                         $childProcessNum = $this->childCount % $this->threadNum;
-                        $this->run($this->threadNum, $childProcessNum);
+                        $this->run($this->threadNum, $childProcessNum, time());
                         exit(0);
                     }
-                } else {
-                    exit(0);
                 }
             }
-        } else {
-            echo "You have no extension: pcntl_fork!\n";
             exit(0);
         }
     }
 
-     /**
-      * 运行指令
-      *
-      * @return void
-      */
-     public function command()
-     {
-         // 检查运行命令的参数
-         global $argv;
-         $start_file = $argv[0];
-         // 命令
-         $command = isset($argv[1]) ? trim($argv[1]) : 'start';
-         // 进程号
-         $pid = isset($argv[2]) ? $argv[2] : '';
-  
-         // 根据命令做相应处理
-         switch ($command) {
-             case 'start':
-                 break;
-             case 'stop':
-                 exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}'", $info);
-                 if (count($info) <= 1) {
-                     echo " [$start_file] not run\n";
-                 } else {
-                     echo "[$start_file] stop success";
-                     exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}' |xargs kill -SIGINT", $info);
-                 }
-                 exit;
-                 break;
-             case 'stop-pid':
-                 echo "[$start_file] stop pid {$pid}";
-                 exec("kill {$pid} -SIGINT");
-                 exit;
-                 break;
-             case 'kill':
-                 exec("ps aux | grep $start_file | grep -v grep | awk '{print $2}' |xargs kill -SIGKILL");
-                 break;
-             case 'kill-pid':
-                 exec("kill {$pid} -SIGKILL");
-                 exit;
-                 break;
-             case 'status':
-                 exit(0);
-             // 未知命令
-             default :
-                 exit("Usage: php yourfile.php {start|stop|kill}\n");
-         }
-    }
-
     /**
-     * 系统负载
+     * 设置子进程运行多久自动退出。
+     *
+     * @param  int  $runDurationExit  运行时长。单位（秒）。0 代表子进程无时间限制。
      *
      * @return void
      */
-    public function getSysLoad()
+    final public function setRunDurationExit($runDurationExit)
     {
-        $loadavg = sys_getloadavg();
-        foreach ($loadavg as $k => $v) {
-            $loadavg[$k] = round($v, 2);
+        $this->runDurationExit = $runDurationExit;
+    }
+
+    /**
+     * 检测主进程是否存活。
+     *
+     * @return bool
+     */
+    final public function detectMasterProcessAlive()
+    {
+        if(posix_kill($this->masterPid, 0)) {
+            return true;
+        } else {
+            return false;
         }
-        return implode(", ", $loadavg);
     }
 
     /**
-     * 清屏
+     * 子进程检测是否需要退出。
+     * 
+     * -- 根据父进程状态决定是否退出。
+     * 
+     * @param  int  $startTimeTsp 子进程启动时间戳。
      *
-     * @return void
+     * @return boolean
      */
-    public function clear()
+    final protected function isExit($startTimeTsp)
     {
-        $arr = array(27, 91, 72, 27, 91, 50, 74);
-        foreach ($arr as $a) {
-            echo chr($a);
+        // [1] 运行超过指定时长则退出。
+        if ($this->runDurationExit > 0) {
+            $diffTime = time() - $startTimeTsp;
+            if ($diffTime >= $this->runDurationExit) {
+                exit(0);
+            }
+        }
+        // [2] 主进程退出则退出。
+        $status = $this->detectMasterProcessAlive();
+        if (!$status) {
+            exit(0);
         }
     }
 
@@ -235,6 +202,7 @@ abstract class Thread
         pcntl_signal(SIGHUP,  [$this, 'signalHandler']);
         pcntl_signal(SIGINT, [$this, 'signalHandler']);
         pcntl_signal(SIGUSR1, [$this, 'signalHandler']);
+        pcntl_signal(SIGCHLD, [$this, 'signalHandler']);
     }
 
     /**
@@ -249,17 +217,10 @@ abstract class Thread
         switch ($signo) {
             case SIGTERM: // 进程退出。
             case SIGINT:  // 进程退出。
-                if (posix_getpid() == $this->masterPid) {
-                    $this->masterStatus = 0; // 设置主进程完毕
-                } else {
-                    // 子进程收到退出信号。
-                    $this->childsPidKill[] = posix_getpid();
-                }
-                break;
             case SIGHUP: // 重启进程。
             case SIGUSR1:
+            case SIGCHLD:
             default:
-                $this->childsPidKill[] = posix_getpid(); // 子进程收到平滑重启信号。
                 break;
         }
     }
@@ -267,7 +228,7 @@ abstract class Thread
     /**
      * 设置进程数。
      *
-     * @param integer $num 进程数量。
+     * @param  int  $num  进程数量。
      * @return void
      */
     final public function setThreadNum($num)
@@ -278,10 +239,11 @@ abstract class Thread
     /**
      * 抽象的业务方法。
      * 
-     * @param int $threadNum  进程数量。
-     * @param int $num        子进程编号。
+     * @param  int  $threadNum     进程数量。
+     * @param  int  $num           子进程编号。
+     * @param  int  $startTimeTsp  子进程启动时间戳。
      * 
      * @return void
      */
-    abstract public function run($threadNum, $num);
+    abstract public function run($threadNum, $num, $startTimeTsp);
 }
