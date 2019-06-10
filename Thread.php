@@ -14,7 +14,6 @@
 
 abstract class Thread
 {
-
     protected $masterPid           = 0;       // 主进程 ID。
     protected $runDurationExit     = 0;       // 子进程运行多久自动退出。0 代表不退出。0 用于那些多进程一次性运算业务。
 
@@ -63,7 +62,6 @@ abstract class Thread
                 $this->childCount++; // 子进程数量加1。
                 // 如果当前子进程数量小于等于允许的进程数量或允许子进程结束新开子进程的情况则执行。
                 if (($this->childCount <= $this->threadNum) || $this->isNewCreate == true) {
-                    sleep(mt_rand(1, 4));
                     $pid = pcntl_fork();
                     if ($pid == -1) {
                         exit('could not fork');
@@ -76,7 +74,8 @@ abstract class Thread
                         }
                     } else {
                         $childProcessNum = $this->childCount % $this->threadNum;
-                        $this->run($this->threadNum, $childProcessNum, time());
+                        $startTimeTsp    = time();
+                        $this->run($this->threadNum, $childProcessNum, $startTimeTsp);
                         exit(0);
                     }
                 }
@@ -113,17 +112,18 @@ abstract class Thread
 
     /**
      * 子进程检测是否需要退出。
-     * 
+     *
      * -- 根据父进程状态决定是否退出。
-     * 
-     * @param  int  $startTimeTsp 子进程启动时间戳。
+     * -- 如果子进程退出不再生成新的子进程。则子进程不限定运行时间。
+     *
+     * @param  int  $startTimeTsp  子进程启动时间戳。
      *
      * @return boolean
      */
     final protected function isExit($startTimeTsp)
     {
         // [1] 运行超过指定时长则退出。
-        if ($this->runDurationExit > 0) {
+        if ($this->isNewCreate && $this->runDurationExit > 0) {
             $diffTime = time() - $startTimeTsp;
             if ($diffTime >= $this->runDurationExit) {
                 exit(0);
@@ -179,7 +179,8 @@ abstract class Thread
      * @param bool $isNewCreate true or false
      * @return void
      */
-    final public function setChildOverNewCreate($isNewCreate) {
+    final public function setChildOverNewCreate($isNewCreate)
+    {
         $this->isNewCreate = $isNewCreate;
     }
 
