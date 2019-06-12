@@ -11,6 +11,7 @@
  * @date 2017-09-15
  */
 
+namespace PHPProcess;
 
 abstract class Thread
 {

@@ -1,0 +1,20 @@
+{
+    "name": "fingerqin/phpthread",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "fingerQin",
+            "email": "753814253@qq.com"
+        }
+    ],
+    "minimum-stability": "dev",
+    "require": {
+        "php": ">=5.6.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "PHPProcess\\": "src/"
+        }
+    }
+}

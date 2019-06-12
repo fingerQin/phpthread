@@ -1,11 +1,13 @@
 <?php
 /**
- * 业务多线程处理
- * @author winerQin
- * @date 2017-05-18
+ * 示例1。
+ * @author fingerQin
+ * @date 2019-06-12
  */
 
-include_once('Thread.php');
+require '../vendor/autoload.php';
+
+use \PHPProcess\Thread;
 
 class Start extends Thread
 {
