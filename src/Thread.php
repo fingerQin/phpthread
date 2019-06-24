@@ -62,7 +62,7 @@ abstract class Thread
             while(true) {
                 $this->childCount++; // 子进程数量加1。
                 // 如果当前子进程数量小于等于允许的进程数量或允许子进程结束新开子进程的情况则执行。
-                if ($this->isNewCreate == true) {
+                if (($this->childCount <= $this->threadNum) || $this->isNewCreate == true) {
                     $pid = pcntl_fork();
                     if ($pid == -1) {
                         exit('could not fork');
@@ -202,6 +202,7 @@ abstract class Thread
     {
         pcntl_signal(SIGTERM, [$this, 'signalHandler']);
         pcntl_signal(SIGHUP,  [$this, 'signalHandler']);
+        pcntl_signal(SIGINT, [$this, 'signalHandler']);
         pcntl_signal(SIGUSR1, [$this, 'signalHandler']);
         pcntl_signal(SIGCHLD, [$this, 'signalHandler']);
     }
@@ -217,6 +218,7 @@ abstract class Thread
     {
         switch ($signo) {
             case SIGTERM: // 进程退出。
+            case SIGINT:  // 进程退出。
             case SIGHUP: // 重启进程。
             case SIGUSR1:
             case SIGCHLD:
