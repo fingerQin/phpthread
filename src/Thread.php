@@ -88,7 +88,7 @@ abstract class Thread
     /**
      * 设置子进程运行多久自动退出。
      *
-     * @param  int  $runDurationExit  运行时长。单位（秒）。0 代表子进程无时间限制。
+     * @param  int  $runDurationExit  运行时长。单位（分）。0 代表子进程无时间限制。
      *
      * @return void
      */
