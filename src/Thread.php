@@ -60,9 +60,9 @@ abstract class Thread
             $this->registerSignal();
 
             while(true) {
-                $this->childCount++; // 子进程数量加1。
+                $this->childCount++;
                 // 如果当前子进程数量小于等于允许的进程数量或允许子进程结束新开子进程的情况则执行。
-                if (($this->childCount <= $this->threadNum) || $this->isNewCreate == true) {
+                if (($this->childCount <= $this->threadNum) || $this->isNewCreate) {
                     $pid = pcntl_fork();
                     if ($pid == -1) {
                         exit('could not fork');
@@ -72,6 +72,10 @@ abstract class Thread
                         if ($this->childCount >= $this->threadNum) {
                             // 如果已经达到指定的进程数量,则挂起当前主进程。直到有子进程退出才执行此
                             pcntl_wait($status);
+                            // 如果不需要生成新的子进程，则等待最后一个进程执行完毕就退出。
+                            if (!$this->isNewCreate && $this->childCount == $this->threadNum) { 
+                                exit(0);
+                            }
                         }
                     } else {
                         $childProcessNum = $this->childCount % $this->threadNum;
